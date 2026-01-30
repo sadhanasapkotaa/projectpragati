@@ -160,3 +160,9 @@ class LogoutUserSerializer(serializers.Serializer):
             return True
         except TokenError:
             return super().fail('bad_token')
+
+class VerifyEmailSerializer(serializers.Serializer):
+    otp_code = serializers.CharField(max_length=6, min_length=6)
+
+    class Meta:
+        fields = ['otp_code']

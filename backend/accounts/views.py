@@ -2,7 +2,8 @@ from django.shortcuts import render
 from rest_framework.generics import GenericAPIView
 from .serializers import (UserRegisterSerializer, UserLoginSerializer, 
                         PasswordResetSerializer, SetNewPasswordSerializer,
-                        PasswordResetConfirmSerializer, LogoutUserSerializer)
+                        PasswordResetConfirmSerializer, LogoutUserSerializer,
+                        VerifyEmailSerializer)
 from rest_framework.response import Response
 from rest_framework import status
 from .utils import send_code_to_user
@@ -34,30 +35,41 @@ class RegisterUserView(GenericAPIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST) 
     
 class VerifyUserEmail(GenericAPIView):
+    serializer_class = VerifyEmailSerializer
+
     def post(self, request):
-        otp_code = request.data.get('otp_code')
-        try:
-            user_code_obj = OneTimePassword.objects.get(code=otp_code)
-            user = user_code_obj.user
-            if not user.is_verified:
-                user.is_verified = True
-                user.save()
+        serializer = self.serializer_class(data=request.data)
+        if serializer.is_valid(raise_exception=True):
+            otp_code = serializer.validated_data['otp_code']
+            try:
+                user_code_obj = OneTimePassword.objects.get(code=otp_code)
+                user = user_code_obj.user
+                if not user.is_verified:
+                    user.is_verified = True
+                    user.save()
+                    return Response(
+                        {
+                            'message': 'Email Verified Successfully'
+                        }, status=status.HTTP_200_OK
+                    )
                 return Response(
                     {
-                        'message': 'Email Verified Successfully'
-                    }, status=status.HTTP_200_OK
+                        'message': 'Code is invalid. Email Already Verified'
+                    }, status=status.HTTP_204_NO_CONTENT
+                    )
+            except OneTimePassword.DoesNotExist:
+                return Response(
+                    {
+                        'message': 'Invalid Code'
+                    }, status=status.HTTP_400_BAD_REQUEST
                 )
-            return Response(
-                {
-                    'message': 'Code is invalid. Email Already Verified'
-                }, status=status.HTTP_204_NO_CONTENT
-                )
-        except OneTimePassword.DoesNotExist:
-            return Response(
-                {
-                    'message': 'Invalid Code'
-                }, status=status.HTTP_400_BAD_REQUEST
-            )
+                
+    def get(self, request):
+        return Response(
+            {
+                'message': 'Please provide OTP code in a POST request'
+            }, status=status.HTTP_400_BAD_REQUEST
+        )
         
 class LoginUserView(GenericAPIView):
     serializer_class= UserLoginSerializer
